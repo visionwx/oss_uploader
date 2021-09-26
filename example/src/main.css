@@ -1,0 +1,10 @@
+#video {
+    width: 480px;
+    height: 270px;
+    object-fit: cover;
+}
+
+.video-container {
+    display: flex;
+    flex-direction: row;
+}
