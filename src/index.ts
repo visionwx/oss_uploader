@@ -206,13 +206,13 @@ export default class AliOssStreamUploader {
       !checkpoint.uploadJobs ||
       !checkpoint.options
     ) {
-      if (this.onCompleteUploadFailed != null) {
+      if (this.onCompleteUploadFailed) {
         this.onCompleteUploadFailed('checkpoint data missing');
       }
       return;
     }
     if (getPartData === null) {
-      if (this.onCompleteUploadFailed != null) {
+      if (this.onCompleteUploadFailed) {
         this.onCompleteUploadFailed('getPartData func not provide');
       }
       return;
@@ -271,7 +271,7 @@ export default class AliOssStreamUploader {
           bucket: this.options.bucket || bucket,
           stsToken: this.stsToken.SecurityToken,
         });
-        if (!this.hasReady && this.onReady != null) {
+        if (!this.hasReady && this.onReady) {
           this.hasReady = true;
           this.onReady();
         }
@@ -282,7 +282,7 @@ export default class AliOssStreamUploader {
       })
       .catch((err: any) => {
         console.error(err);
-        if (this.onGetTokenFailed != null) {
+        if (this.onGetTokenFailed) {
           this.onGetTokenFailed('get sts token failed');
         }
       });
@@ -299,7 +299,7 @@ export default class AliOssStreamUploader {
 
   uploadProcess() {
     // 如果当前没有在init, 同时uploadId等于null, 则出发初始化
-    if (this.uploadId === null) {
+    if (this.uploadId === null || this.uploadId === undefined) {
       this.start();
       this.isUploadProcessRunning = false;
       return;
@@ -350,7 +350,7 @@ export default class AliOssStreamUploader {
         })
       ) {
         console.log('all upload job done success');
-        if (this.completeUpload != null) {
+        if (this.completeUpload) {
           this.completeUpload();
         }
       } else {
@@ -360,7 +360,7 @@ export default class AliOssStreamUploader {
           })
         ) {
           console.log('all upload job done, but some are failed', this.uploadJobs);
-          if (this.onCompleteUploadFailed != null) {
+          if (this.onCompleteUploadFailed) {
             this.onCompleteUploadFailed('not all job are done');
           }
         }
@@ -383,21 +383,21 @@ export default class AliOssStreamUploader {
         this.uploadId = res.uploadId;
         this.isStarting = false;
         this.uploadProcess();
-        if (this.onStartUpload != null) {
+        if (this.onStartUpload) {
           this.onStartUpload();
         }
       })
       .catch((err: any) => {
         console.error(err.name + ': ' + err.message);
         this.isStarting = false;
-        if (this.onStartUploadFailed != null) {
+        if (this.onStartUploadFailed) {
           this.onStartUploadFailed(err);
         }
       });
   }
 
   uploadPart(dataIndex: number, data: Blob[], onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
-    if (this.store === null) {
+    if (this.store === null || this.store === undefined) {
       console.log('oss_uploader store is null');
       return;
     }
@@ -439,7 +439,7 @@ export default class AliOssStreamUploader {
         if (this.onUploadPart) {
           this.onUploadPart(dataIndex, part);
         }
-        if (onSuccess != null) {
+        if (onSuccess) {
           onSuccess(part);
         }
         if (!this.isUploadProcessRunning) {
@@ -452,7 +452,7 @@ export default class AliOssStreamUploader {
         if (this.onUploadPartFailed) {
           this.onUploadPartFailed(dataIndex, blobBuffer);
         }
-        if (onFailed != null) {
+        if (onFailed) {
           onFailed(err);
         }
         if (!this.isUploadProcessRunning) {
@@ -466,7 +466,7 @@ export default class AliOssStreamUploader {
 
     this.isEnded = true;
     this.duration = duration;
-    if (this.timer != null) {
+    if (this.timer) {
       clearInterval(this.timer);
     }
 
@@ -489,7 +489,7 @@ export default class AliOssStreamUploader {
         console.log(res);
         this.isCompleted = true;
         this.isCompleting = false;
-        if (this.onCompleteUpload != null) {
+        if (this.onCompleteUpload) {
           this.onCompleteUpload();
         }
       })
@@ -497,7 +497,7 @@ export default class AliOssStreamUploader {
         console.error(err.name + ': ' + err.message);
         this.isCompleted = false;
         this.isCompleting = false;
-        if (this.onCompleteUploadFailed != null) {
+        if (this.onCompleteUploadFailed) {
           this.onCompleteUploadFailed(err);
         }
       });
