@@ -1,6 +1,6 @@
 {
   "name": "@vision_intelligence/oss_uploader",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "oss uploader",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
