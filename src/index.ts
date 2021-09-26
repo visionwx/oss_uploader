@@ -82,6 +82,7 @@ type CheckPoint = {
   uploadJobs: UploadJob[];
   duration: number | undefined;
   isEnded: boolean;
+  options: Options;
 };
 
 type StsToken = {
@@ -121,7 +122,7 @@ export default class AliOssStreamUploader {
   onCompleteUploadFailed!: (err: string) => void; // 完成上传失败
 
   onUploadPart!: (partIndex: number, part: any) => void; // 上传某个分片成功
-  onUploadPartFailed!: (partIndex: number, partData: Blob | null) => void; // 上传某个分片失败
+  onUploadPartFailed!: (partIndex: number, partData: Blob) => void; // 上传某个分片失败
 
   hasReady: boolean = false;
   onReady!: () => void; // oss 对象已经准备好，相当于已经获取到sts token，并且初始化oss对象成功
@@ -192,12 +193,13 @@ export default class AliOssStreamUploader {
       uploadJobs: this.uploadJobs,
       duration: this.duration,
       isEnded: this.isEnded,
+      options: this.options
     };
   }
 
   resumeCheckpoint(checkpoint: CheckPoint, getPartData: (uploadId: string, partIndex: number) => Promise<Blob>) {
     // check data
-    if (!checkpoint.name || !checkpoint.uploadId || !checkpoint.uploadParts || !checkpoint.uploadJobs) {
+    if (!checkpoint.name || !checkpoint.uploadId || !checkpoint.uploadParts || !checkpoint.uploadJobs || !checkpoint.options) {
       if (this.onCompleteUploadFailed != null) {
         this.onCompleteUploadFailed('checkpoint data missing');
       }
@@ -216,6 +218,7 @@ export default class AliOssStreamUploader {
     this.uploadJobs = checkpoint.uploadJobs;
     this.getPartData = getPartData;
     this.duration = checkpoint.duration;
+    this.options = checkpoint.options;
     // start upload data
     this.resumeUploadJobs();
   }
@@ -389,7 +392,7 @@ export default class AliOssStreamUploader {
 
   uploadPart(
     dataIndex: number,
-    data: Blob[] | undefined,
+    data: Blob[],
     onSuccess?: (res: any) => void,
     onFailed?: (err: string) => void,
   ) {
@@ -397,7 +400,7 @@ export default class AliOssStreamUploader {
       console.log('oss_uploader store is null');
       return;
     }
-    let blobBuffer: Blob | null = new Blob(data, {
+    let blobBuffer: Blob = new Blob(data, {
       type: 'video/webm',
     });
     if (blobBuffer.size < ossMinPartSize) {
@@ -430,8 +433,8 @@ export default class AliOssStreamUploader {
           etag: part.res.headers.etag,
         });
         this.uploadJobs[dataIndex - 1].status = 1;
-        data = undefined;
-        blobBuffer = null;
+        data = [];
+        blobBuffer = {} as Blob;
         if (this.onUploadPart) {
           this.onUploadPart(dataIndex, part);
         }
@@ -457,7 +460,7 @@ export default class AliOssStreamUploader {
       });
   }
 
-  end(duration: number | undefined) {
+  end(duration?: number) {
     console.log('user end record', duration);
 
     this.isEnded = true;
