@@ -458,7 +458,7 @@ export default class AliOssStreamUploader {
       })
       .catch((err: any) => {
         console.error('error upload part, dataIndex=' + dataIndex + ', ' + err.name + ': ' + err.message);
-        
+
         if (this.uploadJobs[dataIndex - 1].retry >= (this.options.maxPartRetryCounts || defaultMaxPartRetryCounts)) {
           // 超过分片最大重传次数
           this.uploadJobs[dataIndex - 1].status = 2;
@@ -475,8 +475,6 @@ export default class AliOssStreamUploader {
           this.uploadJobs[dataIndex - 1].retry = this.uploadJobs[dataIndex - 1].retry + 1;
           this.uploadPart(dataIndex, data, onSuccess, onFailed);
         }
-        
-        
       });
   }
 
