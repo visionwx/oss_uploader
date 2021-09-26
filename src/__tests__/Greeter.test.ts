@@ -2,7 +2,7 @@ import AliOssStreamUploader from '../index';
 
 test('AliOssStreamUploader Init', () => {
   let name: string = 'test.mp4';
-  let getToken: Function = () => {
+  let getToken: () => Promise<any> = () => {
     return new Promise(function (resolve, reject) {
       resolve({
         AccessKeyId: 'string',
