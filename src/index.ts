@@ -39,6 +39,7 @@ import * as OSS from 'ali-oss';
 const bucket = 'boom-video-test';
 const region = 'oss-cn-shenzhen';
 const ossMinPartSize = 102400;
+const defaultMaxPartRetryCounts = 1;
 
 // 0 init, 1 done, 2 failed
 const UploadStatus = {
@@ -51,6 +52,7 @@ type Options = {
   region?: string;
   bucket?: string;
   minPartSize?: number;
+  maxPartRetryCounts?: number;
   timeout?: number;
   mime?: string;
   // meta?: UserMeta;
@@ -126,6 +128,7 @@ export default class AliOssStreamUploader {
 
   hasReady: boolean = false;
   onReady!: () => void; // oss 对象已经准备好，相当于已经获取到sts token，并且初始化oss对象成功
+  onReadyFailed!: (err: string) => void; // getStsToken失败，或者 初始化oss对象失败，或者initMulitUpload失败
   onGetTokenFailed!: (err: string) => void; // 获取sts token失败 callback
 
   // 获取分片数据函数
@@ -285,6 +288,10 @@ export default class AliOssStreamUploader {
         if (this.onGetTokenFailed) {
           this.onGetTokenFailed('get sts token failed');
         }
+        // 获取token失败，并且store还未实例化完成
+        if (this.onReadyFailed && !this.store) {
+          this.onReadyFailed('get sts token failed');
+        }
       });
   }
 
@@ -393,6 +400,9 @@ export default class AliOssStreamUploader {
         if (this.onStartUploadFailed) {
           this.onStartUploadFailed(err);
         }
+        if (this.onReadyFailed) {
+          this.onReadyFailed('initMultipartUpload failed');
+        }
       });
   }
 
@@ -418,7 +428,7 @@ export default class AliOssStreamUploader {
         partIndex: dataIndex,
         partSize: blobBuffer.size,
         status: UploadStatus.uploading,
-        retry: 0,
+        retry: 1,
       };
       this.uploadJobs.push(curUploadJob);
     } else {
@@ -448,16 +458,25 @@ export default class AliOssStreamUploader {
       })
       .catch((err: any) => {
         console.error('error upload part, dataIndex=' + dataIndex + ', ' + err.name + ': ' + err.message);
-        this.uploadJobs[dataIndex - 1].status = 2;
-        if (this.onUploadPartFailed) {
-          this.onUploadPartFailed(dataIndex, blobBuffer);
+        
+        if (this.uploadJobs[dataIndex - 1].retry >= (this.options.maxPartRetryCounts || defaultMaxPartRetryCounts)) {
+          // 超过分片最大重传次数
+          this.uploadJobs[dataIndex - 1].status = 2;
+          if (this.onUploadPartFailed) {
+            this.onUploadPartFailed(dataIndex, blobBuffer);
+          }
+          if (onFailed) {
+            onFailed(err);
+          }
+          if (!this.isUploadProcessRunning) {
+            this.uploadProcess();
+          }
+        } else {
+          this.uploadJobs[dataIndex - 1].retry = this.uploadJobs[dataIndex - 1].retry + 1;
+          this.uploadPart(dataIndex, data, onSuccess, onFailed);
         }
-        if (onFailed) {
-          onFailed(err);
-        }
-        if (!this.isUploadProcessRunning) {
-          this.uploadProcess();
-        }
+        
+        
       });
   }
 
