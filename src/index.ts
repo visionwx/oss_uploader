@@ -370,7 +370,7 @@ export default class AliOssStreamUploader {
 
   start() {
     if (this.isStarting) return;
-    if (this.store == null) {
+    if (this.store === null || this.store === undefined) {
       console.log('oss_uploader store is null');
       return;
     }
