@@ -375,7 +375,7 @@ export default class AliOssStreamUploader {
       return;
     }
     this.isStarting = true;
-    console.log('start', this.store.initMultipartUpload(this.name));
+    console.log('start, initMultipartUpload');
     this.store
       .initMultipartUpload(this.name)
       .then((res: any) => {
