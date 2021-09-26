@@ -19,9 +19,6 @@ ALI_OSS_UPLOADER.onStartUpload = () => {
   // 初始化成功，开始录屏
   // startScreenRecording();
 };
-ALI_OSS_UPLOADER.onStartUploadFailed = (err) => {
-  console.log("onStartUploadFailed", err);
-};
 ALI_OSS_UPLOADER.onCompleteUpload = () => {
   console.log("onCompleteUpload");
 };
@@ -34,6 +31,12 @@ ALI_OSS_UPLOADER.onUploadPart = (res) => {
 ALI_OSS_UPLOADER.onUploadPartFailed = (err) => {
   console.log("onUploadPartFailed", err);
 };
+ALI_OSS_UPLOADER.onReadyFailed = (err) => {
+  console.log("onReadyFailed", err);
+  window.alert("uploader init failed, please check the network");
+  stopRecording();
+}
+
 
 function newRecording(stream: any) {
   // Start Media Recorder
@@ -108,7 +111,6 @@ function startScreenRecording() {
 
     mediaRecorder.start(blob_time_range);
 
-    
   })
 }
 

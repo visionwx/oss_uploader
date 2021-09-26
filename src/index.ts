@@ -1,41 +1,5 @@
 import * as OSS from 'ali-oss';
 
-// let ossRecording = new AliOssStreamUploader();
-// ossRecording.onCompleteUpload = () => {}
-// ossRecording.onUploadPartFailed = () => {
-//   "1. save partData to local disk"
-//   "2. save/update checkpoint"
-// }
-// ossRecording.onCompleteUploadFailed = () => {
-//   checkpoint = ossRecording.generateCheckpoint();
-//   "2. save/update checkpoint"
-// }
-
-// let ossCheckpoint = new AliOssStreamUploader();
-// ossCheckpoint.resumeCheckpoint(checkpoint, (partIndex) => {
-//   return new Promise();
-// });
-// ossCheckpoint.onCompleteUpload = () => {}
-// ossCheckpoint.onCompleteUploadFailed = () => {}
-
-// name = videos/<uploadJobId>_<userId>/<uploadJobId>.mp4
-
-// creds = {
-//    SecurityToken,
-//    AccessKeyId,
-//    AccessKeySecret,
-//    Bucket,
-//    Region,
-// }
-
-// options = {
-//   minPartSize: number | 204800;
-//   timeout?: number | undefined;
-//   mime?: string | undefined;
-//   meta?: UserMeta | undefined;
-//   headers?: object | undefined;
-// }
-
 const bucket = 'boom-video-test';
 const region = 'oss-cn-shenzhen';
 const ossMinPartSize = 102400;
@@ -126,7 +90,7 @@ export default class AliOssStreamUploader {
   onUploadPart!: (partIndex: number, part: any) => void; // 上传某个分片成功
   onUploadPartFailed!: (partIndex: number, partData: Blob) => void; // 上传某个分片失败
 
-  hasReady: boolean = false;
+  hasReady: boolean = false; // 是否已经执行过onReady
   onReady!: () => void; // oss 对象已经准备好，相当于已经获取到sts token，并且初始化oss对象成功
   onReadyFailed!: (err: string) => void; // getStsToken失败，或者 初始化oss对象失败，或者initMulitUpload失败
   onGetTokenFailed!: (err: string) => void; // 获取sts token失败 callback
@@ -156,22 +120,7 @@ export default class AliOssStreamUploader {
     this.currentPartSize = 0;
     this.dataIndex = 0;
 
-    // 回调函数
-    // this.onStartUpload = null; // 开始上传初始化成功
-    // this.onStartUploadFailed = null; // 开始上传初始化失败
-
-    // this.onCompleteUpload = null;       // 完成上传
-    // this.onCompleteUploadFailed = null; // 完成上传失败
-
-    // this.onUploadPart = null;           // 上传某个分片成功
-    // this.onUploadPartFailed = null;     // 上传某个分片失败
-
-    // this.onReady = null; // oss 对象已经准备好，相当于已经获取到sts token，并且初始化oss对象成功
     this.hasReady = false;
-    // this.onGetTokenFailed = null; // 获取sts token失败 callback
-
-    // 获取分片数据函数
-    // this.getPartData = null;
 
     // 最小分片大小
     this.minPartSize = this.options.minPartSize || 204800;
