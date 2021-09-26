@@ -193,13 +193,19 @@ export default class AliOssStreamUploader {
       uploadJobs: this.uploadJobs,
       duration: this.duration,
       isEnded: this.isEnded,
-      options: this.options
+      options: this.options,
     };
   }
 
   resumeCheckpoint(checkpoint: CheckPoint, getPartData: (uploadId: string, partIndex: number) => Promise<Blob>) {
     // check data
-    if (!checkpoint.name || !checkpoint.uploadId || !checkpoint.uploadParts || !checkpoint.uploadJobs || !checkpoint.options) {
+    if (
+      !checkpoint.name ||
+      !checkpoint.uploadId ||
+      !checkpoint.uploadParts ||
+      !checkpoint.uploadJobs ||
+      !checkpoint.options
+    ) {
       if (this.onCompleteUploadFailed != null) {
         this.onCompleteUploadFailed('checkpoint data missing');
       }
@@ -390,12 +396,7 @@ export default class AliOssStreamUploader {
       });
   }
 
-  uploadPart(
-    dataIndex: number,
-    data: Blob[],
-    onSuccess?: (res: any) => void,
-    onFailed?: (err: string) => void,
-  ) {
+  uploadPart(dataIndex: number, data: Blob[], onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
     if (this.store === null) {
       console.log('oss_uploader store is null');
       return;
