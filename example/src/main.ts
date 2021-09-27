@@ -5,6 +5,7 @@ import * as $ from "jquery";
 const name = "test_2021-09-16_1";
 const uploaderOptions = {
   minPartSize: 204800,
+  debug: true
 }
 
 let mediaRecorder:any;

@@ -8,6 +8,7 @@ OSS Uploader
 - generateCheckpoint的时候 支持传入extraData 保存额外信息
 - export所有type
 - options 增加 debug参数，开启关闭日志
+- resumeUploadJob 去掉setTimeout机制
 
 #####  2021-09-26
 - end 函数增加 duration 可选入参。用于记录录制时长，这个参数值 会保存到checkpoint对象当中

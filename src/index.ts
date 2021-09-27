@@ -220,9 +220,10 @@ export default class AliOssStreamUploader {
       });
     } else {
       this.log('resumeUploadJobs, partJobIndex=' + partJobIndex + ', job is done');
-      window.setTimeout(() => {
-        this.resumeUploadJobs(partJobIndex + 1);
-      }, 1);
+      // window.setTimeout(() => {
+      //   this.resumeUploadJobs(partJobIndex + 1);
+      // }, 1);
+      this.resumeUploadJobs(partJobIndex + 1);
     }
   }
 
