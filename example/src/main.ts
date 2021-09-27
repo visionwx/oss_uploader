@@ -9,6 +9,7 @@ const uploaderOptions = {
 
 
 let mediaRecorder:any;
+let media_record_buffer:any = {};
 const blob_time_range = 1000;
 const token = "69792056-1c4c-11ec-b366-00163e1802d1";
 const tokenUrl = "https://api.tf.visionwx.com/media/v1/ossAccessCredentials";
@@ -20,16 +21,22 @@ ALI_OSS_UPLOADER.onStartUpload = () => {
   // startScreenRecording();
 };
 ALI_OSS_UPLOADER.onCompleteUpload = () => {
-  console.log("onCompleteUpload");
+  console.log("onCompleteUpload", ALI_OSS_UPLOADER.generateCheckpoint({
+    foo: 'extra info'
+  }));
 };
 ALI_OSS_UPLOADER.onCompleteUploadFailed = (err) => {
   console.log("onCompleteUploadFailed", err);
+  initOssResumeUploader(ALI_OSS_UPLOADER.generateCheckpoint({
+    foo: 'extra info'
+  }));
 };
 ALI_OSS_UPLOADER.onUploadPart = (res) => {
   console.log("onUploadPart", res);
 };
-ALI_OSS_UPLOADER.onUploadPartFailed = (err) => {
-  console.log("onUploadPartFailed", err);
+ALI_OSS_UPLOADER.onUploadPartFailed = (partIndex, partData) => {
+  console.log("onUploadPartFailed", partIndex);
+  media_record_buffer[ALI_OSS_UPLOADER.uploadId + "_" + partIndex] = partData;
 };
 ALI_OSS_UPLOADER.onReadyFailed = (err) => {
   console.log("onReadyFailed", err);
@@ -37,6 +44,50 @@ ALI_OSS_UPLOADER.onReadyFailed = (err) => {
   stopRecording();
 }
 
+
+function initOssResumeUploader(checkpoint:any) {
+  console.log(checkpoint);
+  let oss_resume_uploader = new AliOssStreamUploader(
+      "resume",
+      getOssStsToken,
+      {
+          minPartSize: 204800
+      }
+  );
+  oss_resume_uploader.onCompleteUpload = () => {
+      window.alert("resume upload success");
+  }
+  oss_resume_uploader.onCompleteUploadFailed = (err) => {
+      console.error("onCompleteUploadFailed", err);
+      console.log(oss_resume_uploader.generateCheckpoint());
+      setTimeout(() => {
+          initOssResumeUploader(checkpoint);
+      }, 5000);
+  }
+  oss_resume_uploader.onReadyFailed = (err) => {
+      console.error("onReadyFailed", err);
+      setTimeout(() => {
+          initOssResumeUploader(checkpoint);
+      }, 5000);
+  }
+  oss_resume_uploader.onUploadPart = (partIndex) => {
+      console.log("oss_resume_uploader.onUploadPart,", oss_resume_uploader.uploadId + "_" + partIndex);
+      media_record_buffer[oss_resume_uploader.uploadId + "_" + partIndex] = null;
+      delete media_record_buffer[oss_resume_uploader.uploadId + "_" + partIndex];
+  }
+  oss_resume_uploader.onReady = () => {
+      oss_resume_uploader.resumeCheckpoint(checkpoint, (uploadId, partIndex) => {
+          return new Promise(function(resolve, reject) {
+              let partData = media_record_buffer[uploadId + "_" + partIndex];
+              if (partData != null) {
+                  resolve(partData);
+              } else {
+                  reject();
+              }
+          });
+      });
+  }
+}
 
 function newRecording(stream: any) {
   // Start Media Recorder
@@ -122,34 +173,6 @@ function startRecording() {
 function stopRecording() {
   mediaRecorder.stop();
 }
-
-// function t() {
-//   let imageCapture;
-//   navigator.mediaDevices.getDisplayMedia(constraints).then(function(stream) {
-//     imageCapture = new ImageCapture(stream.getVideoTracks()[0]);
-//     imageCapture.grabFrame().then((img) => {
-//       console.log(img);
-//     });
-//     imageCapture.takePhoto().then((img) => {
-//       console.log(img);
-//     });
-//   });
-// }
-
-// function processRecordData(blobData) {
-  
-//   let videoSliceObj = document.getElementById("video_slice");
-//   videoSliceObj.src = URL.createObjectURL(blobData);
-//   videoSliceObj.play();
-
-//   console.log("start opencv");
-//   let cap = new window.cv.VideoCapture(videoSliceObj);
-//   console.log(cap);
-//   let src = new window.cv.Mat(blobData.size, cv.CV_8UC4);
-//   cap.read(src);
-//   console.log(src);
-
-// }
 
 function getOssStsToken() {
     return new Promise(function(resolve, reject) {

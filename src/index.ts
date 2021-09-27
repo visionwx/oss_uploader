@@ -217,7 +217,7 @@ export default class AliOssStreamUploader {
     } else {
       window.setTimeout(() => {
         this.resumeUploadJobs(partJobIndex + 1);
-      }, 200);
+      }, 1);
     }
   }
 
