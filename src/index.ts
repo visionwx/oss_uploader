@@ -138,7 +138,7 @@ export default class AliOssStreamUploader {
   }
 
   // generate checkpoint
-  generateCheckpoint(extraData:any): CheckPoint {
+  generateCheckpoint(extraData?:any): CheckPoint {
     return {
       name: this.name,
       uploadId: this.uploadId,
