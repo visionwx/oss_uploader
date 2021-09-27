@@ -60,7 +60,7 @@ export type StsToken = {
 };
 
 export default class AliOssStreamUploader {
-  TAG:string = "[AliOssStreamUploader]";
+  TAG: string = '[AliOssStreamUploader]';
 
   // ali oss 对象
   store!: OSS;
@@ -194,7 +194,7 @@ export default class AliOssStreamUploader {
   }
 
   resumeUploadJobs(partJobIndex: number = 0) {
-    this.log("resumeUploadJobs, partJobIndex=" + partJobIndex );
+    this.log('resumeUploadJobs, partJobIndex=' + partJobIndex);
     if (this.getPartData == null) {
       return;
     }
@@ -219,7 +219,7 @@ export default class AliOssStreamUploader {
         );
       });
     } else {
-      this.log("resumeUploadJobs, partJobIndex=" + partJobIndex + ", job is done");
+      this.log('resumeUploadJobs, partJobIndex=' + partJobIndex + ', job is done');
       window.setTimeout(() => {
         this.resumeUploadJobs(partJobIndex + 1);
       }, 1);
@@ -247,7 +247,7 @@ export default class AliOssStreamUploader {
         }, 30 * 60 * 1000);
       })
       .catch((err: any) => {
-        this.error("updateToken failed", err);
+        this.error('updateToken failed', err);
         if (this.onGetTokenFailed) {
           this.onGetTokenFailed('get sts token failed');
         }
@@ -469,7 +469,7 @@ export default class AliOssStreamUploader {
     this.store
       .completeMultipartUpload(this.name, this.uploadId, this.uploadParts)
       .then((res: any) => {
-        this.log("completeUpload success", res);
+        this.log('completeUpload success', res);
         this.isCompleted = true;
         this.isCompleting = false;
         if (this.onCompleteUpload) {
