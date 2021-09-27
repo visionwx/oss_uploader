@@ -138,7 +138,7 @@ export default class AliOssStreamUploader {
   }
 
   // generate checkpoint
-  generateCheckpoint(extraData?:any): CheckPoint {
+  generateCheckpoint(extraData?: any): CheckPoint {
     return {
       name: this.name,
       uploadId: this.uploadId,
@@ -147,7 +147,7 @@ export default class AliOssStreamUploader {
       duration: this.duration,
       isEnded: this.isEnded,
       options: this.options,
-      extraData
+      extraData,
     };
   }
 
@@ -181,11 +181,9 @@ export default class AliOssStreamUploader {
     this.options = checkpoint.options;
     // 检查是否有uploadId
     if (this.uploadId === null || this.uploadId === undefined) {
-      this.start(
-        (res) => {
-          this.resumeUploadJobs();
-        },
-      );
+      this.start((res) => {
+        this.resumeUploadJobs();
+      });
     } else {
       // start upload data
       this.resumeUploadJobs();
@@ -372,8 +370,7 @@ export default class AliOssStreamUploader {
       });
   }
 
-  uploadPart(dataIndex: number, data: Blob[], 
-    onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
+  uploadPart(dataIndex: number, data: Blob[], onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
     if (this.store === null || this.store === undefined) {
       console.log('oss_uploader store is null');
       return;
