@@ -49,6 +49,7 @@ type CheckPoint = {
   duration: number | undefined;
   isEnded: boolean;
   options: Options;
+  extraData: any;
 };
 
 type StsToken = {
@@ -137,7 +138,7 @@ export default class AliOssStreamUploader {
   }
 
   // generate checkpoint
-  generateCheckpoint(): CheckPoint {
+  generateCheckpoint(extraData:any): CheckPoint {
     return {
       name: this.name,
       uploadId: this.uploadId,
@@ -146,6 +147,7 @@ export default class AliOssStreamUploader {
       duration: this.duration,
       isEnded: this.isEnded,
       options: this.options,
+      extraData: extraData
     };
   }
 
@@ -177,8 +179,17 @@ export default class AliOssStreamUploader {
     this.getPartData = getPartData;
     this.duration = checkpoint.duration;
     this.options = checkpoint.options;
-    // start upload data
-    this.resumeUploadJobs();
+    // 检查是否有uploadId
+    if (this.uploadId === null || this.uploadId === undefined) {
+      this.start(
+        (res) => {
+          this.resumeUploadJobs();
+        },
+      );
+    } else {
+      // start upload data
+      this.resumeUploadJobs();
+    }
   }
 
   resumeUploadJobs(partJobIndex: number = 0) {
@@ -324,7 +335,7 @@ export default class AliOssStreamUploader {
     }
   }
 
-  start() {
+  start(onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
     if (this.isStarting) return;
     if (this.store === null || this.store === undefined) {
       console.log('oss_uploader store is null');
@@ -338,6 +349,9 @@ export default class AliOssStreamUploader {
         // console.log(res);
         this.uploadId = res.uploadId;
         this.isStarting = false;
+        if (onSuccess) {
+          onSuccess(res);
+        }
         this.uploadProcess();
         if (this.onStartUpload) {
           this.onStartUpload();
@@ -346,6 +360,9 @@ export default class AliOssStreamUploader {
       .catch((err: any) => {
         console.error(err.name + ': ' + err.message);
         this.isStarting = false;
+        if (onFailed) {
+          onFailed(err);
+        }
         if (this.onStartUploadFailed) {
           this.onStartUploadFailed(err);
         }
@@ -355,7 +372,8 @@ export default class AliOssStreamUploader {
       });
   }
 
-  uploadPart(dataIndex: number, data: Blob[], onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
+  uploadPart(dataIndex: number, data: Blob[], 
+    onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
     if (this.store === null || this.store === undefined) {
       console.log('oss_uploader store is null');
       return;
