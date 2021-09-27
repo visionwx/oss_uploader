@@ -6,6 +6,8 @@ OSS Uploader
 #####  2021-09-27
 - 支持 initMultiUploader 失败的 checkpoint, 既没有 uploadId时，自动重新 initMultiUpload
 - generateCheckpoint的时候 支持传入extraData 保存额外信息
+- export所有type
+- options 增加 debug参数，开启关闭日志
 
 #####  2021-09-26
 - end 函数增加 duration 可选入参。用于记录录制时长，这个参数值 会保存到checkpoint对象当中
@@ -148,12 +150,6 @@ function initOssResumeUploader(checkpoint) {
     }
     oss_resume_uploader.onCompleteUploadFailed = (err) => {
         console.error("onCompleteUploadFailed", err);
-        setTimeout(() => {
-            initOssResumeUploader(checkpoint);
-        }, 5000);
-    }
-    oss_resume_uploader.onGetTokenFailed = (err) => {
-        console.error("onGetTokenFailed", err);
         setTimeout(() => {
             initOssResumeUploader(checkpoint);
         }, 5000);

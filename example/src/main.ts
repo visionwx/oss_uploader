@@ -7,7 +7,6 @@ const uploaderOptions = {
   minPartSize: 204800,
 }
 
-
 let mediaRecorder:any;
 let media_record_buffer:any = {};
 const blob_time_range = 1000;
