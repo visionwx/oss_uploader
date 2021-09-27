@@ -49,7 +49,7 @@ type CheckPoint = {
   duration: number | undefined;
   isEnded: boolean;
   options: Options;
-  extraData: any;
+  extraData?: any;
 };
 
 type StsToken = {
@@ -147,7 +147,7 @@ export default class AliOssStreamUploader {
       duration: this.duration,
       isEnded: this.isEnded,
       options: this.options,
-      extraData: extraData
+      extraData
     };
   }
 
