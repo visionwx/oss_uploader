@@ -1,7 +1,14 @@
 OSS Uploader
 
+#### ToDo
+- resumeCheckpoint的时候，如果uploadPart的状态是0，也尝试获取数据并重传，如果没有get到数据，则修改状态为2
+- aws s3 支持
 
 #### Change
+
+#####  2021-12-31
+- resumeCheckpoint的时候，如果uploadPart的状态是0，也尝试获取数据并重传，如果没有get到数据，则修改状态为2
+- 增加uploadBuffer接口
 
 #####  2021-09-27
 - 支持 initMultiUploader 失败的 checkpoint, 既没有 uploadId时，自动重新 initMultiUpload

@@ -1,8 +1,9 @@
 require('./main.css');
-import AliOssStreamUploader from '@vision_intelligence/oss_uploader';
+// import AliOssStreamUploader, {Options, StsToken, UploadJob} from '@vision_intelligence/oss_uploader';
 import * as $ from "jquery";
+import AliOssStreamUploader, {Options, StsToken, UploadJob} from '../../lib/index';
 
-const name = "test_2021-09-16_1";
+const name = "test_2021-12-31_1";
 const uploaderOptions = {
   minPartSize: 204800,
   debug: true
@@ -11,8 +12,8 @@ const uploaderOptions = {
 let mediaRecorder:any;
 let media_record_buffer:any = {};
 const blob_time_range = 1000;
-const token = "69792056-1c4c-11ec-b366-00163e1802d1";
-const tokenUrl = "https://api.tf.visionwx.com/media/v1/ossAccessCredentials";
+const token = "***********";
+const tokenUrl = "https://********/media/v1/ossAccessCredentials";
 
 let ALI_OSS_UPLOADER = new AliOssStreamUploader(name, getOssStsToken, uploaderOptions);
 ALI_OSS_UPLOADER.onStartUpload = () => {
@@ -21,22 +22,26 @@ ALI_OSS_UPLOADER.onStartUpload = () => {
   // startScreenRecording();
 };
 ALI_OSS_UPLOADER.onCompleteUpload = () => {
-  console.log("onCompleteUpload", ALI_OSS_UPLOADER.generateCheckpoint({
-    foo: 'extra info'
-  }));
+  let ckpt = ALI_OSS_UPLOADER.generateCheckpoint({
+    event: 'onCompleteUpload'
+  });
+  console.log("onCompleteUpload", ckpt);
+  uploadBuffer(name + "_onCompleteUpload.json", ckpt);
 };
 ALI_OSS_UPLOADER.onCompleteUploadFailed = (err) => {
+  let ckpt = ALI_OSS_UPLOADER.generateCheckpoint({
+    event: 'onCompleteUploadFailed'
+  });
   console.log("onCompleteUploadFailed", err);
-  initOssResumeUploader(ALI_OSS_UPLOADER.generateCheckpoint({
-    foo: 'extra info'
-  }));
+  initOssResumeUploader(ckpt);
+  uploadBuffer(name + "_onCompleteUploadFailed.json", ckpt);
 };
 ALI_OSS_UPLOADER.onUploadPart = (res) => {
   console.log("onUploadPart", res);
 };
 ALI_OSS_UPLOADER.onUploadPartFailed = (partIndex, partData) => {
   console.log("onUploadPartFailed", partIndex);
-  media_record_buffer[ALI_OSS_UPLOADER.uploadId + "_" + partIndex] = partData;
+  // media_record_buffer[ALI_OSS_UPLOADER.uploadId + "_" + partIndex] = partData;
 };
 ALI_OSS_UPLOADER.onReadyFailed = (err) => {
   console.log("onReadyFailed", err);
@@ -56,6 +61,10 @@ function initOssResumeUploader(checkpoint:any) {
   );
   oss_resume_uploader.onCompleteUpload = () => {
       window.alert("resume upload success");
+      let ckpt = oss_resume_uploader.generateCheckpoint({
+        event: 'onResumeCompleteUpload'
+      });
+      uploadBuffer(name + "_onResumeCompleteUpload.json", ckpt);
   }
   oss_resume_uploader.onCompleteUploadFailed = (err) => {
       console.error("onCompleteUploadFailed", err);
@@ -211,6 +220,17 @@ function getOssStsToken() {
     });
 }
 
+function uploadBuffer(uploadPath:string, datas:object) {
+  ALI_OSS_UPLOADER.uploadBuffer(
+    uploadPath, 
+    new Blob([JSON.stringify(datas)])
+  ).then((res) => {
+    console.log("upload buffer success", res);
+  }).catch((err) => {
+    console.error("upload buffer failed", err);
+  });
+}
+
 function initBtn() {
     if (document === null) return; 
 
@@ -227,6 +247,37 @@ function initBtn() {
         stopRecordBtn.onclick = () => {
             console.log("stop record");
             stopRecording();
+        }
+    }
+
+    const uploadBufferBtn = document.getElementById("btn3");
+    if (uploadBufferBtn != null) {
+      uploadBufferBtn.onclick = () => {
+            console.log("start upload buffer");
+            let datas = {
+              "name": "test",
+              "cpu": [
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50},
+                {"usage": 50}
+              ],
+            };
+            uploadBuffer(
+              "upload_buffer/logs/2021-12-31.json",
+              datas
+            );
         }
     }
 }

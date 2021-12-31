@@ -1,4 +1,5 @@
 import * as OSS from 'ali-oss';
+// const path = require("path");
 
 const bucket = 'boom-video-test';
 const region = 'oss-cn-shenzhen';
@@ -59,6 +60,11 @@ export type StsToken = {
   SecurityToken: string;
 };
 
+export type UploadError = {
+  name: string;
+  message: string;
+}
+
 export default class AliOssStreamUploader {
   TAG: string = '[AliOssStreamUploader]';
 
@@ -86,10 +92,10 @@ export default class AliOssStreamUploader {
 
   // 回调
   onStartUpload!: () => void; // 开始上传初始化成功
-  onStartUploadFailed!: (err: string) => void; // 开始上传初始化失败
+  onStartUploadFailed!: (err: UploadError) => void; // 开始上传初始化失败
 
   onCompleteUpload!: () => void; // 完成上传
-  onCompleteUploadFailed!: (err: string) => void; // 完成上传失败
+  onCompleteUploadFailed!: (err: UploadError) => void; // 完成上传失败
 
   onUploadPart!: (partIndex: number, part: any) => void; // 上传某个分片成功
   onUploadPartFailed!: (partIndex: number, partData: Blob) => void; // 上传某个分片失败
@@ -164,13 +170,19 @@ export default class AliOssStreamUploader {
       !checkpoint.options
     ) {
       if (this.onCompleteUploadFailed) {
-        this.onCompleteUploadFailed('checkpoint data missing');
+        this.onCompleteUploadFailed({
+          name: 'CheckpointDataMissing',
+          message: 'checkpoint data is not complete'
+        });
       }
       return;
     }
     if (getPartData === null) {
       if (this.onCompleteUploadFailed) {
-        this.onCompleteUploadFailed('getPartData func not provide');
+        this.onCompleteUploadFailed({
+          name: 'GetPartDataNotProvide',
+          message: 'getPartData function not provide'
+        });
       }
       return;
     }
@@ -205,25 +217,35 @@ export default class AliOssStreamUploader {
     }
     const partJobStatus = this.uploadJobs[partJobIndex].status;
     const partIndex = this.uploadJobs[partJobIndex].partIndex;
-    if (partJobStatus === UploadStatus.failed) {
+    if (partJobStatus === UploadStatus.failed || 
+      partJobStatus === UploadStatus.uploading
+    ) {
       this.getPartData(this.uploadId, partIndex).then((partData: Blob) => {
         this.uploadPart(
           partIndex,
           [partData],
           () => {
+            // success
             this.resumeUploadJobs(partJobIndex + 1);
           },
           () => {
+            // failed
             this.resumeUploadJobs(partJobIndex + 1);
           },
         );
+      }).catch((err) => {
+        // get part data failed, part data missing, set job to done status
+        this.uploadJobs[partJobIndex].status = UploadStatus.done;
+        window.setTimeout(() => {
+          this.resumeUploadJobs(partJobIndex + 1);
+        }, 100);
       });
     } else {
       this.log('resumeUploadJobs, partJobIndex=' + partJobIndex + ', job is done');
-      // window.setTimeout(() => {
-      //   this.resumeUploadJobs(partJobIndex + 1);
-      // }, 1);
-      this.resumeUploadJobs(partJobIndex + 1);
+      window.setTimeout(() => {
+        this.resumeUploadJobs(partJobIndex + 1);
+      }, 100);
+      // this.resumeUploadJobs(partJobIndex + 1);
     }
   }
 
@@ -330,7 +352,10 @@ export default class AliOssStreamUploader {
         ) {
           this.log('all upload job done, but some are failed', this.uploadJobs);
           if (this.onCompleteUploadFailed) {
-            this.onCompleteUploadFailed('not all job are done');
+            this.onCompleteUploadFailed({
+              name: 'NotAllJobDone',
+              message: 'not all job done, some are failed'
+            });
           }
         }
       }
@@ -485,6 +510,20 @@ export default class AliOssStreamUploader {
           this.onCompleteUploadFailed(err);
         }
       });
+  }
+
+  // upload buffer to object storage
+  uploadBuffer(remotePath: string, bufferData: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.store.put(
+        remotePath, 
+        bufferData
+      ).then((result) => {
+        resolve(result);
+      }).catch((err) => {
+        reject(err);
+      });
+    }); 
   }
 
   log(content: string, extraData?: any) {
