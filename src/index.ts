@@ -63,7 +63,7 @@ export type StsToken = {
 export type UploadError = {
   name: string;
   message: string;
-}
+};
 
 export default class AliOssStreamUploader {
   TAG: string = '[AliOssStreamUploader]';
@@ -172,7 +172,7 @@ export default class AliOssStreamUploader {
       if (this.onCompleteUploadFailed) {
         this.onCompleteUploadFailed({
           name: 'CheckpointDataMissing',
-          message: 'checkpoint data is not complete'
+          message: 'checkpoint data is not complete',
         });
       }
       return;
@@ -181,7 +181,7 @@ export default class AliOssStreamUploader {
       if (this.onCompleteUploadFailed) {
         this.onCompleteUploadFailed({
           name: 'GetPartDataNotProvide',
-          message: 'getPartData function not provide'
+          message: 'getPartData function not provide',
         });
       }
       return;
@@ -217,29 +217,29 @@ export default class AliOssStreamUploader {
     }
     const partJobStatus = this.uploadJobs[partJobIndex].status;
     const partIndex = this.uploadJobs[partJobIndex].partIndex;
-    if (partJobStatus === UploadStatus.failed || 
-      partJobStatus === UploadStatus.uploading
-    ) {
-      this.getPartData(this.uploadId, partIndex).then((partData: Blob) => {
-        this.uploadPart(
-          partIndex,
-          [partData],
-          () => {
-            // success
+    if (partJobStatus === UploadStatus.failed || partJobStatus === UploadStatus.uploading) {
+      this.getPartData(this.uploadId, partIndex)
+        .then((partData: Blob) => {
+          this.uploadPart(
+            partIndex,
+            [partData],
+            () => {
+              // success
+              this.resumeUploadJobs(partJobIndex + 1);
+            },
+            () => {
+              // failed
+              this.resumeUploadJobs(partJobIndex + 1);
+            },
+          );
+        })
+        .catch((err) => {
+          // get part data failed, part data missing, set job to done status
+          this.uploadJobs[partJobIndex].status = UploadStatus.done;
+          window.setTimeout(() => {
             this.resumeUploadJobs(partJobIndex + 1);
-          },
-          () => {
-            // failed
-            this.resumeUploadJobs(partJobIndex + 1);
-          },
-        );
-      }).catch((err) => {
-        // get part data failed, part data missing, set job to done status
-        this.uploadJobs[partJobIndex].status = UploadStatus.done;
-        window.setTimeout(() => {
-          this.resumeUploadJobs(partJobIndex + 1);
-        }, 100);
-      });
+          }, 100);
+        });
     } else {
       this.log('resumeUploadJobs, partJobIndex=' + partJobIndex + ', job is done');
       window.setTimeout(() => {
@@ -354,7 +354,7 @@ export default class AliOssStreamUploader {
           if (this.onCompleteUploadFailed) {
             this.onCompleteUploadFailed({
               name: 'NotAllJobDone',
-              message: 'not all job done, some are failed'
+              message: 'not all job done, some are failed',
             });
           }
         }
@@ -515,15 +515,15 @@ export default class AliOssStreamUploader {
   // upload buffer to object storage
   uploadBuffer(remotePath: string, bufferData: any): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.store.put(
-        remotePath, 
-        bufferData
-      ).then((result) => {
-        resolve(result);
-      }).catch((err) => {
-        reject(err);
-      });
-    }); 
+      this.store
+        .put(remotePath, bufferData)
+        .then((result) => {
+          resolve(result);
+        })
+        .catch((err) => {
+          reject(err);
+        });
+    });
   }
 
   log(content: string, extraData?: any) {
