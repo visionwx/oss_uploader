@@ -5,6 +5,8 @@ OSS Uploader
 - aws s3 支持
 
 #### Change
+##### 2021-01-04
+- 优化ali-oss引入方式，直接使用aliyun-oss-sdk.min.js, 解决node引入的代码压缩错误
 
 #####  2021-12-31
 - resumeCheckpoint的时候，如果uploadPart的状态是0，也尝试获取数据并重传，如果没有get到数据，则修改状态为2

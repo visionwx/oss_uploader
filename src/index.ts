@@ -1,4 +1,5 @@
-import * as OSS from 'ali-oss';
+// import * as OSS from 'ali-oss';
+import * as OSS from './aliyun-oss-sdk.min.js';
 // const path = require("path");
 
 const bucket = 'boom-video-test';

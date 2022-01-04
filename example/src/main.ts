@@ -12,8 +12,8 @@ const uploaderOptions = {
 let mediaRecorder:any;
 let media_record_buffer:any = {};
 const blob_time_range = 1000;
-const token = "***********";
-const tokenUrl = "https://********/media/v1/ossAccessCredentials";
+const token = "**********"
+const tokenUrl = "https://*********/media/v1/ossAccessCredentials";
 
 let ALI_OSS_UPLOADER = new AliOssStreamUploader(name, getOssStsToken, uploaderOptions);
 ALI_OSS_UPLOADER.onStartUpload = () => {
