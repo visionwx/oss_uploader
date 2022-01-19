@@ -1,5 +1,5 @@
-// import * as OSS from 'ali-oss';
-import * as OSS from './aliyun-oss-sdk.min.js';
+import * as OSS from 'ali-oss';
+// import * as OSS from './aliyun-oss-sdk.min.js';
 // const path = require("path");
 
 const bucket = 'boom-video-test';
@@ -99,12 +99,12 @@ export default class AliOssStreamUploader {
   onCompleteUploadFailed!: (err: UploadError) => void; // 完成上传失败
 
   onUploadPart!: (partIndex: number, part: any) => void; // 上传某个分片成功
-  onUploadPartFailed!: (partIndex: number, partData: Blob) => void; // 上传某个分片失败
+  onUploadPartFailed!: (partIndex: number, partData: Blob, error: any) => void; // 上传某个分片失败
 
   hasReady: boolean = false; // 是否已经执行过onReady
   onReady!: () => void; // oss 对象已经准备好，相当于已经获取到sts token，并且初始化oss对象成功
-  onReadyFailed!: (err: string) => void; // getStsToken失败，或者 初始化oss对象失败，或者initMulitUpload失败
-  onGetTokenFailed!: (err: string) => void; // 获取sts token失败 callback
+  onReadyFailed!: (err: any) => void; // getStsToken失败，或者 初始化oss对象失败，或者initMulitUpload失败
+  onGetTokenFailed!: (err: any) => void; // 获取sts token失败 callback
 
   // 获取分片数据函数
   getPartData!: (uploadId: string, partIndex: number) => Promise<Blob>;
@@ -430,11 +430,11 @@ export default class AliOssStreamUploader {
 
     this.store
       .uploadPart(this.name, this.uploadId as string, dataIndex, blobBuffer, 0, blobBuffer.size)
-      .then((part: any) => {
+      .then((part) => {
         this.log('done upload part, dataIndex=' + dataIndex);
         this.uploadParts.push({
           number: dataIndex,
-          etag: part.res.headers.etag,
+          etag: (part.res.headers as any).etag,
         });
         this.uploadJobs[dataIndex - 1].status = 1;
         data = [];
@@ -449,14 +449,14 @@ export default class AliOssStreamUploader {
           this.uploadProcess();
         }
       })
-      .catch((err: any) => {
+      .catch((err) => {
         this.error('error upload part, dataIndex=' + dataIndex + ', ' + err.name + ': ' + err.message);
 
         if (this.uploadJobs[dataIndex - 1].retry >= (this.options.maxPartRetryCounts || defaultMaxPartRetryCounts)) {
           // 超过分片最大重传次数
           this.uploadJobs[dataIndex - 1].status = 2;
           if (this.onUploadPartFailed) {
-            this.onUploadPartFailed(dataIndex, blobBuffer);
+            this.onUploadPartFailed(dataIndex, blobBuffer, err);
           }
           if (onFailed) {
             onFailed(err);
