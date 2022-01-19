@@ -239,13 +239,13 @@ export default class AliOssStreamUploader {
           this.uploadJobs[partJobIndex].status = UploadStatus.done;
           window.setTimeout(() => {
             this.resumeUploadJobs(partJobIndex + 1);
-          }, 100);
+          }, 1);
         });
     } else {
       this.log('resumeUploadJobs, partJobIndex=' + partJobIndex + ', job is done');
       window.setTimeout(() => {
         this.resumeUploadJobs(partJobIndex + 1);
-      }, 100);
+      }, 1);
       // this.resumeUploadJobs(partJobIndex + 1);
     }
   }
