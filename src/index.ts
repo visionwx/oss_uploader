@@ -407,13 +407,14 @@ export default class AliOssStreamUploader {
     let blobBuffer: Blob = new Blob(data, {
       type: 'video/webm',
     });
-    if (blobBuffer.size < ossMinPartSize) {
-      this.warn('upload part size smaller than ossMinPartSize=', ossMinPartSize);
-      if (!this.isUploadProcessRunning) {
-        this.uploadProcess();
-      }
-      return;
-    }
+    /// 取消兜底，不拦截小数据
+    // if (blobBuffer.size < ossMinPartSize) {
+    //   this.warn('upload part size smaller than ossMinPartSize=', ossMinPartSize);
+    //   if (!this.isUploadProcessRunning) {
+    //     this.uploadProcess();
+    //   }
+    //   return;
+    // }
 
     this.log('start upload part, dataIndex=' + dataIndex + ', dataSize=' + blobBuffer.size);
     if (this.uploadJobs.length < dataIndex) {
