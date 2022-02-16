@@ -2,7 +2,7 @@ import * as OSS from 'ali-oss';
 // import * as OSS from './aliyun-oss-sdk.min.js';
 // const path = require("path");
 
-const bucket = 'boom-video-test';
+const bucket = 'boom-upload-test';
 const region = 'oss-cn-shenzhen';
 const ossMinPartSize = 102400;
 const defaultMaxPartRetryCounts = 1;
@@ -56,14 +56,20 @@ export type CheckPoint = {
 };
 
 export type StsToken = {
-  AccessKeyId: string;
-  AccessKeySecret: string;
-  SecurityToken: string;
+  accessKeyId: string;
+  accessKeySecret: string;
+  stsToken: string;
 };
 
 export type UploadError = {
   name: string;
   message: string;
+};
+
+export const CallbackName = {
+  uploading: 0,
+  done: 1,
+  failed: 2,
 };
 
 export default class AliOssStreamUploader {
@@ -75,12 +81,16 @@ export default class AliOssStreamUploader {
 
   // oss上的文件名称
   name: string;
+  uploadId: string;
 
-  getToken: () => Promise<any>;
+  getToken: () => Promise<{
+    accessKeyId: string;
+    accessKeySecret: string;
+    stsToken: string;
+  }>;
 
   options: Options;
 
-  uploadId!: string;
   uploadParts: UploadPart[] = [];
   uploadJobs: UploadJob[] = [];
 
@@ -92,22 +102,22 @@ export default class AliOssStreamUploader {
   duration: number | undefined;
 
   // 回调
-  onStartUpload!: () => void; // 开始上传初始化成功
-  onStartUploadFailed!: (err: UploadError) => void; // 开始上传初始化失败
+  onStartUpload?: () => void; // 开始上传初始化成功
+  onStartUploadFailed?: (err: UploadError) => void; // 开始上传初始化失败
 
-  onCompleteUpload!: () => void; // 完成上传
-  onCompleteUploadFailed!: (err: UploadError) => void; // 完成上传失败
+  onCompleteUpload?: () => void; // 完成上传
+  onCompleteUploadFailed?: (err: UploadError) => void; // 完成上传失败
 
-  onUploadPart!: (partIndex: number, part: any) => void; // 上传某个分片成功
-  onUploadPartFailed!: (partIndex: number, partData: Blob, error: any) => void; // 上传某个分片失败
+  onUploadPart?: (partIndex: number, part: any) => void; // 上传某个分片成功
+  onUploadPartFailed?: (partIndex: number, partData: Blob, error: any) => void; // 上传某个分片失败
 
   hasReady: boolean = false; // 是否已经执行过onReady
-  onReady!: () => void; // oss 对象已经准备好，相当于已经获取到sts token，并且初始化oss对象成功
-  onReadyFailed!: (err: any) => void; // getStsToken失败，或者 初始化oss对象失败，或者initMulitUpload失败
-  onGetTokenFailed!: (err: any) => void; // 获取sts token失败 callback
+  onReady?: () => void; // oss 对象已经准备好，相当于已经获取到sts token，并且初始化oss对象成功
+  onReadyFailed?: (errorDescription: string) => void; // getStsToken失败，或者 初始化oss对象失败，或者initMulitUpload失败
+  onGetTokenFailed?: (errorDescription: string) => void; // 获取sts token失败 callback
 
   // 获取分片数据函数
-  getPartData!: (uploadId: string, partIndex: number) => Promise<Blob>;
+  getPartData?: (uploadId: string, partIndex: number) => Promise<Blob>;
 
   minPartSize: number;
 
@@ -115,14 +125,23 @@ export default class AliOssStreamUploader {
   isStarting: boolean = false;
   isUploadProcessRunning: boolean = false;
   isEnded: boolean = false;
-  isCompleted: boolean = false;
-  isCompleting: boolean = false;
+  didAbort = false;
 
   // setTimeout handler of updateToken
   timer: any;
 
-  constructor(name: string, getToken: () => Promise<any>, options: Options) {
+  constructor(
+    name: string,
+    uploadId: string,
+    getToken: () => Promise<{
+      accessKeyId: string;
+      accessKeySecret: string;
+      stsToken: string;
+    }>,
+    options: Options,
+  ) {
     this.name = name;
+    this.uploadId = uploadId;
     this.options = options;
     this.uploadParts = [];
     this.uploadJobs = []; // partIndex, partSize, status, retry, backup
@@ -140,8 +159,6 @@ export default class AliOssStreamUploader {
     this.isStarting = false;
     this.isUploadProcessRunning = false;
     this.isEnded = false; // 是否主动发起结束
-    this.isCompleted = false; // 是否已经完成
-    this.isCompleting = false; // 是否正在完成
 
     this.getToken = getToken;
     this.updateToken();
@@ -195,18 +212,12 @@ export default class AliOssStreamUploader {
     this.getPartData = getPartData;
     this.duration = checkpoint.duration;
     this.options = checkpoint.options;
-    // 检查是否有uploadId
-    if (this.uploadId === null || this.uploadId === undefined) {
-      this.start((res) => {
-        this.resumeUploadJobs();
-      });
-    } else {
-      // start upload data
+    if (this.uploadId) {
       this.resumeUploadJobs();
     }
   }
 
-  resumeUploadJobs(partJobIndex: number = 0) {
+  async resumeUploadJobs(partJobIndex: number = 0) {
     this.log('resumeUploadJobs, partJobIndex=' + partJobIndex);
     if (this.getPartData == null) {
       return;
@@ -219,91 +230,66 @@ export default class AliOssStreamUploader {
     const partJobStatus = this.uploadJobs[partJobIndex].status;
     const partIndex = this.uploadJobs[partJobIndex].partIndex;
     if (partJobStatus === UploadStatus.failed || partJobStatus === UploadStatus.uploading) {
-      this.getPartData(this.uploadId, partIndex)
-        .then((partData: Blob) => {
-          this.uploadPart(
-            partIndex,
-            [partData],
-            () => {
-              // success
-              this.resumeUploadJobs(partJobIndex + 1);
-            },
-            () => {
-              // failed
-              this.resumeUploadJobs(partJobIndex + 1);
-            },
-          );
-        })
-        .catch((err) => {
-          // get part data failed, part data missing, set job to done status
-          this.uploadJobs[partJobIndex].status = UploadStatus.done;
-          window.setTimeout(() => {
-            this.resumeUploadJobs(partJobIndex + 1);
-          }, 1);
-        });
+      try {
+        const partData = await this.getPartData(this.uploadId, partIndex);
+        try {
+          await this.uploadPart(partIndex, [partData]);
+        } catch {}
+        this.resumeUploadJobs(partJobIndex + 1);
+      } catch (err) {
+        // get part data failed, part data missing, set job to done status
+        this.uploadJobs[partJobIndex].status = UploadStatus.done;
+        await this.resumeUploadJobs(partJobIndex + 1);
+      }
     } else {
       this.log('resumeUploadJobs, partJobIndex=' + partJobIndex + ', job is done');
-      window.setTimeout(() => {
-        this.resumeUploadJobs(partJobIndex + 1);
-      }, 1);
-      // this.resumeUploadJobs(partJobIndex + 1);
+      await this.resumeUploadJobs(partJobIndex + 1);
     }
   }
 
-  updateToken() {
-    this.getToken()
-      .then((stsToken: StsToken) => {
-        this.stsToken = stsToken;
-        this.store = new OSS({
-          region: this.options.region || region,
-          accessKeyId: this.stsToken.AccessKeyId,
-          accessKeySecret: this.stsToken.AccessKeySecret,
-          bucket: this.options.bucket || bucket,
-          stsToken: this.stsToken.SecurityToken,
-        });
-        if (!this.hasReady && this.onReady) {
-          this.hasReady = true;
-          this.onReady();
-        }
-        this.log('Done init oss_uploader store', this.store);
-        this.timer = setTimeout(() => {
-          this.updateToken();
-        }, 30 * 60 * 1000);
-      })
-      .catch((err: any) => {
-        this.error('updateToken failed', err);
-        if (this.onGetTokenFailed) {
-          this.onGetTokenFailed('get sts token failed');
-        }
-        // 获取token失败，并且store还未实例化完成
-        if (this.onReadyFailed && !this.store) {
-          this.onReadyFailed('get sts token failed');
-        }
+  async updateToken() {
+    try {
+      const { accessKeyId, accessKeySecret, stsToken } = await this.getToken();
+      console.log({ accessKeyId, accessKeySecret, stsToken });
+      this.store = new OSS({
+        region: this.options.region || region,
+        accessKeyId: accessKeyId,
+        accessKeySecret: accessKeySecret,
+        bucket: this.options.bucket || bucket,
+        stsToken: stsToken,
+        refreshSTSToken: this.getToken,
+        refreshSTSTokenInterval: 1000 * 60 * 50, // 每50分钟refresh
       });
+      if (!this.hasReady && this.onReady) {
+        this.hasReady = true;
+        this.onReady();
+      }
+      this.log('Done init oss_uploader store', this.store);
+    } catch (err) {
+      this.error('updateToken failed', err);
+      if (this.onGetTokenFailed) {
+        this.onGetTokenFailed('get sts token failed');
+      }
+      // 获取token失败，并且store还未实例化完成
+      if (this.onReadyFailed && !this.store) {
+        this.onReadyFailed('get sts token failed');
+      }
+    }
   }
 
   push(blobData: Blob) {
+    console.log(this.isUploadProcessRunning);
     if (blobData && blobData.size > 0) {
       this.recordedBlobs.push(blobData);
+      // 保证每次只有一个uploadProcess在进行
       if (!this.isUploadProcessRunning) {
         this.uploadProcess();
       }
     }
   }
 
-  uploadProcess() {
-    // 如果当前没有在init, 同时uploadId等于null, 则出发初始化
-    if (this.uploadId === null || this.uploadId === undefined) {
-      this.start();
-      this.isUploadProcessRunning = false;
-      return;
-    }
-
-    // 是否已经完成上传
-    if (this.isCompleted) {
-      this.isUploadProcessRunning = false;
-      return;
-    }
+  async uploadProcess() {
+    if (this.didAbort) return;
 
     this.isUploadProcessRunning = true;
 
@@ -316,105 +302,69 @@ export default class AliOssStreamUploader {
       if (this.currentPartSize >= this.minPartSize) {
         this.dataIndex += 1;
         const partData = this.recordedBlobs.splice(0, this.currentPartIndex + 1);
-        this.uploadPart(this.dataIndex, partData);
+        try {
+          await this.uploadPart(this.dataIndex, partData);
+        } catch {}
         break;
       }
     }
 
-    this.checkIfAllJobToBeDone();
+    if (this.isEnded) {
+      this.checkIfAllJobToBeDone();
+    }
 
     this.isUploadProcessRunning = false;
   }
 
+  // 检查是否全部分片都上传完成
   checkIfAllJobToBeDone() {
-    // 检查是否全部分片都上传完成
-    if (this.isEnded) {
-      if (this.recordedBlobs.length > 0 && !this.isCompleting) {
-        this.log('upload the left data');
-        this.dataIndex += 1;
-        const partData = this.recordedBlobs.splice(0, this.recordedBlobs.length);
-        this.uploadPart(this.dataIndex, partData);
-      }
+    if (this.recordedBlobs.length > 0) {
+      this.log('upload the left data');
+      this.dataIndex += 1;
+      const partData = this.recordedBlobs.splice(0, this.recordedBlobs.length);
+      this.uploadPart(this.dataIndex, partData);
+    }
 
+    if (
+      this.uploadJobs.every((job) => {
+        return job.status === UploadStatus.done;
+      })
+    ) {
+      this.log('all upload job done success');
+      if (this.onCompleteUpload) {
+        this.onCompleteUpload();
+      }
+    } else {
       if (
         this.uploadJobs.every((job) => {
-          return job.status === 1;
+          return job.status === UploadStatus.done || job.status === UploadStatus.failed;
         })
       ) {
-        this.log('all upload job done success');
-        if (this.completeUpload) {
-          this.completeUpload();
-        }
-      } else {
-        if (
-          this.uploadJobs.every((job) => {
-            return job.status === 1 || job.status === 2;
-          })
-        ) {
-          this.log('all upload job done, but some are failed', this.uploadJobs);
-          if (this.onCompleteUploadFailed) {
-            this.onCompleteUploadFailed({
-              name: 'NotAllJobDone',
-              message: 'not all job done, some are failed',
-            });
-          }
+        this.log('all upload job done, but some are failed', this.uploadJobs);
+        if (this.onCompleteUploadFailed) {
+          this.onCompleteUploadFailed({
+            name: 'NotAllJobDone',
+            message: 'not all job done, some are failed',
+          });
         }
       }
     }
   }
 
-  start(onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
-    if (this.isStarting) return;
+  /**
+   * 每一个分片上传函数
+   * @param dataIndex 分片索引
+   * @param data 分片数据
+   * @returns Promise<OSS.UploadPartResult>
+   */
+  async uploadPart(dataIndex: number, data: Blob[]): Promise<OSS.UploadPartResult> {
     if (this.store === null || this.store === undefined) {
       this.log('oss_uploader store is null');
-      return;
-    }
-    this.isStarting = true;
-    this.log('start, initMultipartUpload');
-    this.store
-      .initMultipartUpload(this.name)
-      .then((res: any) => {
-        this.uploadId = res.uploadId;
-        this.isStarting = false;
-        if (onSuccess) {
-          onSuccess(res);
-        }
-        this.uploadProcess();
-        if (this.onStartUpload) {
-          this.onStartUpload();
-        }
-      })
-      .catch((err: any) => {
-        this.error(err.name + ': ' + err.message);
-        this.isStarting = false;
-        if (onFailed) {
-          onFailed(err);
-        }
-        if (this.onStartUploadFailed) {
-          this.onStartUploadFailed(err);
-        }
-        if (this.onReadyFailed) {
-          this.onReadyFailed('initMultipartUpload failed');
-        }
-      });
-  }
-
-  uploadPart(dataIndex: number, data: Blob[], onSuccess?: (res: any) => void, onFailed?: (err: string) => void) {
-    if (this.store === null || this.store === undefined) {
-      this.log('oss_uploader store is null');
-      return;
+      throw 'oss_uploader store is null';
     }
     let blobBuffer: Blob = new Blob(data, {
       type: 'video/webm',
     });
-    /// 取消兜底，不拦截小数据
-    // if (blobBuffer.size < ossMinPartSize) {
-    //   this.warn('upload part size smaller than ossMinPartSize=', ossMinPartSize);
-    //   if (!this.isUploadProcessRunning) {
-    //     this.uploadProcess();
-    //   }
-    //   return;
-    // }
 
     this.log('start upload part, dataIndex=' + dataIndex + ', dataSize=' + blobBuffer.size);
     if (this.uploadJobs.length < dataIndex) {
@@ -429,47 +379,41 @@ export default class AliOssStreamUploader {
       this.uploadJobs[dataIndex - 1].status = UploadStatus.uploading;
     }
 
-    this.store
-      .uploadPart(this.name, this.uploadId as string, dataIndex, blobBuffer, 0, blobBuffer.size)
-      .then((part) => {
-        this.log('done upload part, dataIndex=' + dataIndex);
-        this.uploadParts.push({
-          number: dataIndex,
-          etag: (part.res.headers as any).etag,
-        });
-        this.uploadJobs[dataIndex - 1].status = 1;
-        data = [];
-        blobBuffer = {} as Blob;
-        if (this.onUploadPart) {
-          this.onUploadPart(dataIndex, part);
-        }
-        if (onSuccess) {
-          onSuccess(part);
+    try {
+      const part = await this.store.uploadPart(this.name, this.uploadId, dataIndex, blobBuffer, 0, blobBuffer.size);
+      this.log('done upload part, dataIndex=' + dataIndex);
+      this.uploadParts.push({
+        number: dataIndex,
+        etag: (part.res.headers as any).etag,
+      });
+      this.uploadJobs[dataIndex - 1].status = UploadStatus.done;
+      data = [];
+      blobBuffer = {} as Blob;
+      if (this.onUploadPart) {
+        this.onUploadPart(dataIndex, part);
+      }
+
+      if (!this.isUploadProcessRunning) {
+        this.uploadProcess();
+      }
+      return part;
+    } catch (err: any) {
+      this.error('error upload part, dataIndex=' + dataIndex + ', ' + err.name + ': ' + err.message);
+      // 超过分片最大重传次数 - throw
+      if (this.uploadJobs[dataIndex - 1].retry >= (this.options.maxPartRetryCounts || defaultMaxPartRetryCounts)) {
+        this.uploadJobs[dataIndex - 1].status = UploadStatus.failed;
+        if (this.onUploadPartFailed) {
+          this.onUploadPartFailed(dataIndex, blobBuffer, err);
         }
         if (!this.isUploadProcessRunning) {
           this.uploadProcess();
         }
-      })
-      .catch((err) => {
-        this.error('error upload part, dataIndex=' + dataIndex + ', ' + err.name + ': ' + err.message);
-
-        if (this.uploadJobs[dataIndex - 1].retry >= (this.options.maxPartRetryCounts || defaultMaxPartRetryCounts)) {
-          // 超过分片最大重传次数
-          this.uploadJobs[dataIndex - 1].status = 2;
-          if (this.onUploadPartFailed) {
-            this.onUploadPartFailed(dataIndex, blobBuffer, err);
-          }
-          if (onFailed) {
-            onFailed(err);
-          }
-          if (!this.isUploadProcessRunning) {
-            this.uploadProcess();
-          }
-        } else {
-          this.uploadJobs[dataIndex - 1].retry = this.uploadJobs[dataIndex - 1].retry + 1;
-          this.uploadPart(dataIndex, data, onSuccess, onFailed);
-        }
-      });
+        throw err;
+      } else {
+        this.uploadJobs[dataIndex - 1].retry = this.uploadJobs[dataIndex - 1].retry + 1;
+        return await this.uploadPart(dataIndex, data);
+      }
+    }
   }
 
   end(duration?: number) {
@@ -486,32 +430,18 @@ export default class AliOssStreamUploader {
     }
   }
 
-  abort(): Promise<any> {
-    return this.store.abortMultipartUpload(this.name, this.uploadId as string);
-  }
-
-  completeUpload() {
-    if (this.isCompleting) return;
-    this.log('completeUpload', this.uploadParts);
-    this.isCompleting = true;
-    this.store
-      .completeMultipartUpload(this.name, this.uploadId, this.uploadParts)
-      .then((res: any) => {
-        this.log('completeUpload success', res);
-        this.isCompleted = true;
-        this.isCompleting = false;
-        if (this.onCompleteUpload) {
-          this.onCompleteUpload();
+  /// 检查所有的分片都停之后再resolve
+  abort(): Promise<boolean> {
+    this.didAbort = true;
+    // 轮训检查isUploadProcessRunning，为false才resolve
+    return new Promise((resolve) => {
+      const interval = setInterval(() => {
+        if (!this.isUploadProcessRunning) {
+          clearInterval(interval);
+          resolve(true);
         }
-      })
-      .catch((err: any) => {
-        this.error(err.name + ': ' + err.message);
-        this.isCompleted = false;
-        this.isCompleting = false;
-        if (this.onCompleteUploadFailed) {
-          this.onCompleteUploadFailed(err);
-        }
-      });
+      }, 100);
+    });
   }
 
   // upload buffer to object storage

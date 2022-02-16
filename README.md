@@ -5,6 +5,8 @@ OSS Uploader
 - aws s3 支持
 
 #### Change
+##### 2021-02-16
+* 更新接口至v2
 ##### 2021-01-04
 - 优化ali-oss引入方式，直接使用aliyun-oss-sdk.min.js, 解决node引入的代码压缩错误
 
